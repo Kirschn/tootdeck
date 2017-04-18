@@ -1,0 +1,3 @@
+[submodule "mastodon.js"]
+	path = mastodon.js
+	url = https://github.com/Kirschn/mastodon.js
