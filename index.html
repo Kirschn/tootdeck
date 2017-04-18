@@ -17,7 +17,7 @@
                 "follow"
             ],
             website: "http://github.com/Kirschn/tootdeck"
-        };
+        }, api;
 
 
         // Storage method function
@@ -28,47 +28,25 @@
             }
             if (storeMethod === "localStorage") {
                 return {
-                    saveVar: function (key, content) {
-                        localStorage.setItem(key, content)
+                    setItem: function (key, content) {
+                        return localStorage.setItem(key, content)
                     },
-                    loadVar: function (key) {
-                        localStorage.getItem(key);
+                    getItem: function (key) {
+                        return localStorage.getItem(key);
                     }
                 }
             }
         };
         var varStorage = new initLocalStorage("localStorage");
 
-        // check if we're authenticated and have an application
-        if (varStorage.getItem("oauth_token") === undefined) {
-            var instanceURL = window.prompt("please gimme your mastodon instance domain", "https://pleasehug.me");
-            if (instanceURL === null || instanceURL === "") {
-                window.location.href="https://pleasehug.me";
-            } else {
-                varStorage.setItem("domain", instanceURL);
-                    var api = new MastodonAPI({
-                        instance: instanceURL
-                    });
-                    api.registerApplication(clientConfig.application_name,
-                    clientConfig.redirect_uri,
-                    clientConfig.scopes,
-                    clientConfig.website, function (data) {
-                        varStorage.setItem("client_id", data["client_id"]);
-                        varStorage.setItem("client_secret", data["client_secret"]);
-                        varStorage.setItem("client_redirect_uri", data["redirect_uri"]);
-                        window.location.href = api.generateAuthLink(data["client_id"],
-                            data["redirect_uri"],
-                            "code", // oauth method
-                            clientConfig.scopes //scopes
-                        );
-                    });
-            }
-
-
-        }
         if (window.location.href.indexOf("?code=") !== -1) {
+
+            api = new MastodonAPI({
+                instance: varStorage.getItem("domain")
+            });
             // nice, we got our auth code!
             // lets put it into a variable
+
             var authCode = window.location.href.replace(window.location.origin + window.location.pathname + "?code=", "");
             // nice variable clusterfuck, eh?
             // we have everything needed to access our oauth token
@@ -82,10 +60,44 @@
                     // use api.setConfig("api_user_token", tokenvar) to set it without having to reinit the entire
                     // library.
                     console.log(data);
+                    // set oauth token to cache
+                    varStorage.setItem("oauth_token", data["access_token"]);
+                    //and remove it from the url bar, just because of security
+                    window.history.pushState("", "", window.location.origin + window.location.pathname);
                 }
 
             )
         }
+
+        // check if we're authenticated and have an application
+        if (varStorage.getItem("oauth_token") === null) {
+            var instanceURL = window.prompt("please gimme your mastodon instance domain", "https://pleasehug.me");
+            if (instanceURL === null || instanceURL === "") {
+                //window.location.href="https://pleasehug.me";
+            } else {
+                varStorage.setItem("domain", instanceURL);
+                    api = new MastodonAPI({
+                        instance: instanceURL
+                    });
+                    api.registerApplication(clientConfig.application_name,
+                    clientConfig.redirect_uri,
+                    clientConfig.scopes,
+                    clientConfig.website, function (data) {
+                        varStorage.setItem("client_id", data["client_id"]);
+                        varStorage.setItem("client_secret", data["client_secret"]);
+                        varStorage.setItem("client_redirect_uri", data["redirect_uri"]);
+                        console.log(data);
+                        window.location.href = api.generateAuthLink(data["client_id"],
+                            data["redirect_uri"],
+                            "code", // oauth method
+                            clientConfig.scopes //scopes
+                        );
+                    });
+            }
+
+
+        }
+
     </script>
 </head>
 <body>
