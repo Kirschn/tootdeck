@@ -16,10 +16,30 @@
                 "write",
                 "follow"
             ],
-            website: "http://github.com/Kirschn/tootdeck"
+            website: "http://github.com/Kirschn/tootdeck",
+            removeDeletedTootsFromTL: true
         }, api;
 
-
+        var timelineStreams = {
+            localTL: {
+                id: "federatedTL",
+                streamEndpoint: "public:local",
+                prefillEndpoint: "timelines/public?local",
+                param: false
+            },
+            federatedTL: {
+                id: "federatedTL",
+                streamEndpoint: "public",
+                prefillEndpoint: "timelines/public",
+                param: false
+            },
+            hashtagTL: {
+                id: "hashtagTL",
+                streamEndpint: "hashtag&tag=",
+                prefillEndpoint: "timelines/tag/",
+                param: true
+            }
+        };
         // Storage method function
         // add some ajax functions or whatever if you don't trust the local browser storage
         var initLocalStorage = function (storeMethod) {
@@ -98,7 +118,7 @@
 
 
         }
-        function generateTimeline(type, localAPI, id, additionalData) {
+        function generateTimeline(type, id, user) {
 
             // generate basic HTML structure
             var mainTLElement = document.createElement("div");
@@ -106,30 +126,128 @@
             mainTLElement.id = "timelineWrapper-" + type + "-" + id;
             var TLWrapper = document.createElement("div");
             mainTLElement.className = "timeline-content";
+            if (type === "home") {
+                mainTLElement.className += " home-" + user;
+            }
             mainTLElement.id = "timelineContent-" + type + "-" + id;
             mainTLElement.appendChild(TLWrapper);
             document.getElementById("mainContentBody").appendChild(mainTLElement);
-            // start api logic
-            if (type === "stream-local") {
-                localAPI.stream("public", function (data) {
-                    console.log(data);
-                    if (data.event === "update") {
-                        var aviWrapper = document.createElement("div"),
-                            usernameWrapper = document.createElement("div"),
-                            tootContentWrapper = document.createElement("div");
-                        aviWrapper.className = "avatar-timeline-normal";
-                        usernameWrapper.className = "username-timeline-normal";
-                        tootContentWrapper.className = "tootcontent-timeline-normal";
-                        aviWrapper.innerHTML = "<a><img src='" + data.payload.account.avatar + "'></a>";
-                        usernameWrapper.innerHTML = "<a>" + data.payload.account.username + "</a>";
-                        tootContentWrapper.innerHTML = "<a>" + data.payload.content + "'</a>";
-                        document.getElementById("timelineContent-" + type + "-" + id).appendChild(aviWrapper);
-                        document.getElementById("timelineContent-" + type + "-" + id).appendChild(usernameWrapper);
-                        document.getElementById("timelineContent-" + type + "-" + id).appendChild(tootContentWrapper);
-                    }
-                })
+            return true;
+
+        }
+        function initializeTimeline(type, localAPI, id, data) {
+            var prefillPoint,
+                streamPoint;
+            if (timelineStreams[type] !== undefined) {
+                prefillPoint = timelineStreams[type].prefillEndpoint;
+                streamPoint = timelineStreams[type].streamEndpoint;
+                if (timelineStreams[type].param) {
+                    prefillPoint += data;
+                    streamPoint += data;
+                }
+            }
+            fillTimelineFromAPIEndpoint(prefillPoint, localAPI, type, id);
+            localAPI.stream(streamPoint, function (data) {
+                console.log(data);
+                if (data.event === "update") {
+                    pushTootToTimeline(data.payload.id,
+                        data.payload.account.display_name,
+                        data.payload.account.avatar,
+                        data.payload.content,
+                        data.payload.account.acct,
+                        data.payload.account.url,
+                        type,
+                        id,
+                        false,
+                        data.payload.reblog
+                    );
+                } else if (data.event === "delete" && clientConfig.removeDeletedTootsFromTL) {
+                    document.getElementById(data.payload.id + "-" + id).remove();
+                }
+            })
+        }
+        function fillTimelineFromAPIEndpoint(endpoint, localAPI, type, id) {
+            localAPI.get(endpoint, function (prefillData) {
+                console.log(prefillData);
+                prefillData.forEach(function(currentToot) {
+                    pushTootToTimeline(
+                        currentToot.id,
+                        currentToot.account.display_name,
+                        currentToot.account.avatar,
+                        currentToot.content,
+                        currentToot.account.acct,
+                        currentToot.account.url,
+                        type,
+                        id,
+                        true,
+                        currentToot.reblog
+                    );
+                });
+            });
+        }
+        function pushTootToTimeline(id, username, aviLink, content, handle, onClickLink, timelineType, timelineID, end, reblog, fullTLID) {
+            var aviWrapper = document.createElement("div"),
+                usernameWrapper = document.createElement("div"),
+                tootContentWrapper = document.createElement("div"),
+                tootWrapper = document.createElement("div");
+            aviWrapper.className = "avatar-timeline-normal";
+            usernameWrapper.className = "username-timeline-normal";
+            tootContentWrapper.className = "tootcontent-timeline-normal";
+            tootWrapper.id = id + "-" + timelineID;
+            var retoot = true;
+            if (typeof reblog === "undefined") {
+                retoot = false;
+            } else if (reblog === null) {
+                retoot = false;
+            }
+            if (!retoot) {
+                aviWrapper.innerHTML = "<a href='" + onClickLink + "'><img src='" + aviLink + "'></a>";
+                usernameWrapper.innerHTML = "<a href='" + onClickLink + "'><b>" + username + "</b> " + handle +"</a>";
+            } else {
+                aviWrapper.innerHTML = "<a href='" + onClickLink + "'><img src='" + reblog.account.avatar + "'></a>";
+                usernameWrapper.innerHTML = "<a href='" + onClickLink + "'><b>" + username + "</b> " + handle +"</a>" +
+                        " boosted <a href='" + reblog.account.url + "'><b>" + reblog.account.display_name + "</b> " +
+                        reblog.account.acct +"</a>";
+            }
+            tootContentWrapper.innerHTML = content;
+            tootWrapper.appendChild(aviWrapper);
+            tootWrapper.appendChild(usernameWrapper);
+            tootWrapper.appendChild(tootContentWrapper);
+            if (typeof fullTLID === "undefined") {
+                fullTLID = "timelineContent-" + timelineType + "-" + timelineID;
+            }
+            var elTL = document.getElementById(fullTLID);
+            if (end === false) {
+                elTL.insertBefore(tootWrapper, elTL.firstChild);
+            } else {
+                elTL.append(tootWrapper);
             }
 
+        }
+        function startHomeStreamForUser(localAPI, user) {
+            localAPI.stream("home", function (data) {
+                if (data.event === "update") {
+                    document.getElementsByClassName("home-" + user).forEach(function (currentElement) {
+                        pushTootToTimeline(data.payload.id,
+                            data.payload.account.display_name,
+                            data.payload.account.avatar,
+                            data.payload.content,
+                            data.payload.account.acct,
+                            data.payload.account.url,
+                            null,
+                            null,
+                            false,
+                            data.payload.reblog,
+                            currentElement.id
+                        );
+                    })
+                } else if (data.event === "delete" && clientConfig.removeDeletedTootsFromTL) {
+                    // TODO
+                } else if (data.event === "notification") {
+                    console.log(data.payload);
+                }
+
+            })
         }
         function init() {
             if (typeof api === "undefined") {
@@ -138,8 +256,9 @@
                     "api_user_token": varStorage.getItem("oauth_token")
                 });
             }
-            generateTimeline("stream-local", api, "teststream");
+            generateTimeline("stream-public", api, "teststream");
         }
+
     </script>
 </head>
 <body onload="init()">
