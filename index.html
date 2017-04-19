@@ -99,6 +99,8 @@
 
         }
         function generateTimeline(type, localAPI, id, additionalData) {
+
+            // generate basic HTML structure
             var mainTLElement = document.createElement("div");
             mainTLElement.className = "timeline-wrapper";
             mainTLElement.id = "timelineWrapper-" + type + "-" + id;
