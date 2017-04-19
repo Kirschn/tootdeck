@@ -64,6 +64,7 @@
                     varStorage.setItem("oauth_token", data["access_token"]);
                     //and remove it from the url bar, just because of security
                     window.history.pushState("", "", window.location.origin + window.location.pathname);
+                    api.setConfig("api_user_token", data["access_token"]);
                 }
 
             )
@@ -97,10 +98,51 @@
 
 
         }
+        function generateTimeline(type, localAPI, id, additionalData) {
+            var mainTLElement = document.createElement("div");
+            mainTLElement.className = "timeline-wrapper";
+            mainTLElement.id = "timelineWrapper-" + type + "-" + id;
+            var TLWrapper = document.createElement("div");
+            mainTLElement.className = "timeline-content";
+            mainTLElement.id = "timelineContent-" + type + "-" + id;
+            mainTLElement.appendChild(TLWrapper);
+            document.getElementById("mainContentBody").appendChild(mainTLElement);
+            // start api logic
+            if (type === "stream-local") {
+                localAPI.stream("public", function (data) {
+                    console.log(data);
+                    if (data.event === "update") {
+                        var aviWrapper = document.createElement("div"),
+                            usernameWrapper = document.createElement("div"),
+                            tootContentWrapper = document.createElement("div");
+                        aviWrapper.className = "avatar-timeline-normal";
+                        usernameWrapper.className = "username-timeline-normal";
+                        tootContentWrapper.className = "tootcontent-timeline-normal";
+                        aviWrapper.innerHTML = "<a><img src='" + data.payload.account.avatar + "'></a>";
+                        usernameWrapper.innerHTML = "<a>" + data.payload.account.username + "</a>";
+                        tootContentWrapper.innerHTML = "<a>" + data.payload.content + "'</a>";
+                        document.getElementById("timelineContent-" + type + "-" + id).appendChild(aviWrapper);
+                        document.getElementById("timelineContent-" + type + "-" + id).appendChild(usernameWrapper);
+                        document.getElementById("timelineContent-" + type + "-" + id).appendChild(tootContentWrapper);
+                    }
+                })
+            }
 
+        }
+        function init() {
+            if (typeof api === "undefined") {
+                api = new MastodonAPI({
+                    instance: varStorage.getItem("domain"),
+                    "api_user_token": varStorage.getItem("oauth_token")
+                });
+            }
+            generateTimeline("stream-local", api, "teststream");
+        }
     </script>
 </head>
-<body>
+<body onload="init()">
+    <div id="mainContentBody">
 
+    </div>
 </body>
 </html>
