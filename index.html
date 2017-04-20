@@ -5,6 +5,78 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
     <script type="text/javascript" src="mastodon.js/mastodon.js"></script>
     <title>Tootdeck</title>
+    <style type="text/css">
+        body {
+            margin: 0;
+            padding: 0;
+        }
+        #mainContentBody {
+            height: 100%;
+            overflow-x: scroll;
+            width: auto;
+            white-space: nowrap;
+            position: absolute;
+            top: 0;
+            left:0;
+            float: left;
+        }
+        .timeline-wrapper {
+            margin: 2pt;
+            width: 300pt;
+            height: calc(100% - 4pt);
+            background-color: gray;
+            padding: 4pt;
+            float: left;
+            overflow-y: scroll;
+        }
+        .timeline-content {
+
+        }
+        .avatar-timeline-normal {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 48pt;
+            width: 48pt;
+            padding: 0;
+            margin: 0;
+        }
+        .username-timeline-normal {
+            position: relative;
+            left: 50pt;
+            top: 0;
+            width: calc(100% - 54pt);
+
+        }
+        .tootcontent-timeline-normal {
+            position: relative;
+            left: 50pt;
+            top: 0;
+            width: calc(100% - 54pt);
+
+
+        }
+        .tootcontent-timeline-normal span {
+            display: inline-block;
+        }
+        .tootcontent-timeline-normal p {
+            display: inline;
+        }
+        .toot-wrapper-obj {
+            position: relative;
+            width: 100%;
+            border-bottom: solid black 1pt;
+            margin-bottom: 9pt;
+            min-height: 60pt;
+            padding-bottom: 3pt;
+            white-space: normal;
+        }
+        .notification-event-wrapper {
+            position: relative;
+            left: 50pt;
+            width: calc(100% - 54pt);
+        }
+    </style>
     <script>
 
         // el config
@@ -20,9 +92,11 @@
             removeDeletedTootsFromTL: true
         }, api;
 
+        //Polyfill hell
+
         var timelineStreams = {
             localTL: {
-                id: "federatedTL",
+                id: "localTL",
                 streamEndpoint: "public:local",
                 prefillEndpoint: "timelines/public?local",
                 param: false
@@ -125,13 +199,13 @@
             mainTLElement.className = "timeline-wrapper";
             mainTLElement.id = "timelineWrapper-" + type + "-" + id;
             var TLWrapper = document.createElement("div");
-            mainTLElement.className = "timeline-content";
+            TLWrapper.className = "timeline-content";
             if (type === "home") {
-                mainTLElement.className += " home-" + user;
+                TLWrapper.className += " home-" + user;
             } else if (type === "notifications") {
-                mainTLElement.className += " notifications-" + user;
+                TLWrapper.className += " notifications-" + user;
             }
-            mainTLElement.id = "timelineContent-" + type + "-" + id;
+            TLWrapper.id = "timelineContent-" + type + "-" + id;
             mainTLElement.appendChild(TLWrapper);
             document.getElementById("mainContentBody").appendChild(mainTLElement);
             return true;
@@ -164,7 +238,12 @@
                         data.payload.reblog
                     );
                 } else if (data.event === "delete" && clientConfig.removeDeletedTootsFromTL) {
-                    document.getElementById(data.payload.id + "-" + id).remove();
+                    var toot = document.getElementById(data.payload+ "-null");
+                    if (toot !== null) {
+                        document.getElementById(data.payload + "-null").remove();
+                    } else  {
+                        console.log("Not removing " + data.payload + ", toot isn't shown.")
+                    }
                 }
             })
         }
@@ -196,24 +275,29 @@
             usernameWrapper.className = "username-timeline-normal";
             tootContentWrapper.className = "tootcontent-timeline-normal";
             tootWrapper.id = id + "-" + timelineID;
+            tootWrapper.className = "toot-wrapper-obj";
             var retoot = true;
             if (typeof reblog === "undefined") {
                 retoot = false;
             } else if (reblog === null) {
                 retoot = false;
             } else if (reblog === false) {
-                retoot = fasle;
+                retoot = false;
             }
+            console.log(reblog);
             if (!retoot) {
-                aviWrapper.innerHTML = "<a href='" + onClickLink + "'><img src='" + aviLink + "'></a>";
+                console.log("No retoot");
+                aviWrapper.innerHTML = "<a href='" + onClickLink + "'><img class='avatar-timeline-normal' src='" + aviLink + "'></a>";
                 usernameWrapper.innerHTML = "<a href='" + onClickLink + "'><b>" + username + "</b> " + handle +"</a>";
+                tootContentWrapper.innerHTML = content;
             } else {
-                aviWrapper.innerHTML = "<a href='" + onClickLink + "'><img src='" + reblog.account.avatar + "'></a>";
+                console.log("Retoot");
+                aviWrapper.innerHTML = "<a href='" + onClickLink + "'><img class='avatar-timeline-normal' src='" + reblog.account.avatar + "'></a>";
                 usernameWrapper.innerHTML = "<a href='" + onClickLink + "'><b>" + username + "</b> " + handle +"</a>" +
                         " boosted <a href='" + reblog.account.url + "'><b>" + reblog.account.display_name + "</b> " +
                         reblog.account.acct +"</a>";
+                tootContentWrapper.innerHTML = reblog.content;
             }
-            tootContentWrapper.innerHTML = content;
             tootWrapper.appendChild(aviWrapper);
             tootWrapper.appendChild(usernameWrapper);
             tootWrapper.appendChild(tootContentWrapper);
@@ -240,15 +324,17 @@
                 tootWrapper = document.createElement("div"),
                 notificationType = "";
             aviWrapper.className = "avatar-timeline-normal";
-            usernameWrapper.className = "username-timeline-normal-notification";
-            rtNotificationWrapper.className = "notification-timeline-wrapper";
-            tootContentWrapper.className = "tootcontent-timeline-normal-notification";
+            usernameWrapper.className = "username-timeline-normal";
+            tootContentWrapper.className = "tootcontent-timeline-normal";
+            tootWrapper.id = favObj.id + "-" + fullTLID;
+            tootWrapper.className = "toot-wrapper-obj";
+            rtNotificationWrapper.className = "notification-event-wrapper";
             tootWrapper.id = favObj.id + "-" + fullTLID;
             if (favObj.type === "favourite") {
-                notificationType = "favourited"
+                notificationType = "favourited";
                 rtNotificationWrapper.innerHTML = "<a href='" + favObj.account.url + "' title='" + favObj.account.acct +"'>" +
                     "<b>" + favObj.account.display_name + "</b></a> " + notificationType +" your status";
-                aviWrapper.innerHTML = "<a href='" + favObj.account.url  + "'><img src='" + favObj.account.avatar + "'></a>";
+                aviWrapper.innerHTML = "<a href='" + favObj.account.url  + "'><img class='avatar-timeline-normal' src='" + favObj.account.avatar + "'></a>";
                 usernameWrapper.innerHTML = "<a href='" + favObj.status.account.url  + "'><b>"
                     + favObj.status.account.display_name + "</b> " +
                     favObj.status.account.acct +"</a>";
@@ -257,21 +343,21 @@
                 notificationType = "boosted";
                 rtNotificationWrapper.innerHTML = "<a href='" + favObj.account.url + "' title='" + favObj.account.acct +"'>" +
                     "<b>" + favObj.account.display_name + "</b></a> " + notificationType +" your status";
-                aviWrapper.innerHTML = "<a href='" + favObj.account.url  + "'><img src='" + favObj.account.avatar + "'></a>";
+                aviWrapper.innerHTML = "<a href='" + favObj.account.url  + "'><img class='avatar-timeline-normal' src='" + favObj.account.avatar + "'></a>";
                 usernameWrapper.innerHTML = "<a href='" + favObj.status.account.url  + "'><b>"
                     + favObj.status.account.display_name + "</b> " +
                     favObj.status.account.acct +"</a>";
                 tootContentWrapper.innerHTML = favObj.status.content;
             } else if (favObj.type === "mention") {
                 pushTootToTimeline(favObj.status.id, favObj.status.account.display_name, favObj.account.avatar,
-                    favObj.status.content, favObj.status.account.url, null, null, end, null, fullTLID
+                    favObj.status.content, favObj.account.acct, favObj.status.account.url, null, null, end, null, fullTLID
                 );
                 return true;
             } else if (favObj.type === "follow") {
                 notificationType = "followed";
                 rtNotificationWrapper.innerHTML = "<a href='" + favObj.account.url + "' title='" + favObj.account.acct +"'>"+
                     "<b>" + favObj.account.display_name + "</b></a> " + notificationType +" you";
-                aviWrapper.innerHTML = "<a href='" + favObj.account.url + "'><img src='" + favObj.account.avatar + "'></a>";
+                aviWrapper.innerHTML = "<a href='" + favObj.account.url + "'><img class='avatar-timeline-normal' src='" + favObj.account.avatar + "'></a>";
                 usernameWrapper.innerHTML = "<a href='" + favObj.account.url + "'><b>" + favObj.account.display_name + "</b> " + favObj.account.acct +"</a>";
                 tootContentWrapper.innerHTML = "<i>"+favObj.account.note+"</i>";
             }
@@ -330,6 +416,8 @@
             generateTimeline("home", 1, "Kirschn");
             generateTimeline("notifications", 1, "Kirschn");
             startHomeStreamForUser(api, "Kirschn");
+            generateTimeline("federatedTL", 2, "Kirschn");
+            initializeTimeline("federatedTL", api, 2);
         }
 
     </script>
